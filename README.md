@@ -45,7 +45,7 @@ FPV Track Designer is an interactive 3D application for planning and visualizing
 
 ## 🎮 Controls
 
-### Edit Mode
+### Desktop - Edit Mode
 | Control | Action |
 |---------|--------|
 | **Left Click** | Select/drag gates |
@@ -56,12 +56,22 @@ FPV Track Designer is an interactive 3D application for planning and visualizing
 | **Ctrl + Z** | Undo last action |
 | **Escape** | Deselect / Cancel |
 
-### Path Mode
+### Desktop - Path Mode
 | Control | Action |
 |---------|--------|
 | **Left Click + Drag** | Trace flight path |
 | **Scroll Wheel** | Adjust drawing altitude |
 | **Escape** | Exit path mode |
+
+### 📱 Mobile / Touch Controls
+| Gesture | Action |
+|---------|--------|
+| **Tap** | Select gate |
+| **Drag (1 finger)** | Pan camera / Drag gate / Draw path |
+| **Pinch** | Zoom in/out |
+| **Two-finger drag** | Rotate camera view |
+| **Quick bar buttons** | Access main functions |
+| **☰ Menu buttons** | Open gates/controls panels |
 
 ## 🛠️ Getting Started
 
@@ -121,12 +131,28 @@ FPVTrackPlanner/
 - **Fonts**: [Exo 2](https://fonts.google.com/specimen/Exo+2) & [Bebas Neue](https://fonts.google.com/specimen/Bebas+Neue)
 - **No Dependencies**: Pure vanilla JavaScript, no build tools required
 
+## 📱 Mobile Support
+
+The app is fully responsive and works on mobile devices:
+
+- **Collapsible Panels**: Slide-out menus for gates and controls
+- **Touch Gestures**: Pinch to zoom, two-finger rotate, drag to pan
+- **Quick Action Bar**: Bottom toolbar for fast access to main functions
+- **Touch-Optimized UI**: Larger tap targets, mobile-friendly buttons
+- **Gate Controls**: On-screen rotation buttons for selected gates
+
 ## 🌐 Browser Support
 
+### Desktop
 - Chrome 80+
 - Firefox 75+
 - Safari 14+
 - Edge 80+
+
+### Mobile
+- iOS Safari 14+
+- Chrome for Android
+- Samsung Internet
 
 *Requires WebGL support*
 

@@ -16,10 +16,16 @@
 
     <div class="notification" id="notification"></div>
     <div class="rotation-indicator" id="rotationIndicator">0°</div>
+    
+    <!-- Mobile panel overlay backdrop -->
+    <div class="panel-overlay" id="panelOverlay"></div>
 
     <div id="canvas-container"></div>
 
     <div class="ui-overlay header">
+        <button class="mobile-menu-btn" id="gatesMenuBtn" aria-label="Toggle Gates Menu">
+            <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
         <div class="logo">
             <div class="logo-icon">
                 <svg viewBox="0 0 24 24">
@@ -34,11 +40,17 @@
             </div>
         </div>
         <div class="mode-badge edit-mode" id="modeBadge">Edit Mode</div>
+        <button class="mobile-menu-btn" id="controlsMenuBtn" aria-label="Toggle Controls Menu">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
     </div>
 
-    <div class="ui-overlay gates-panel">
+    <div class="ui-overlay gates-panel" id="gatesPanel">
         <div class="panel">
-            <div class="panel-title">Race Gates</div>
+            <div class="panel-header">
+                <div class="panel-title">Race Gates</div>
+                <button class="panel-close-btn" id="closeGatesPanel" aria-label="Close">×</button>
+            </div>
             <div class="gate-item" data-gate="square" title="Standard 5×5ft square gate">
                 <div class="gate-icon">▢</div>
                 <div class="gate-info"><h3>Square Gate</h3><span>5×5 ft Standard</span></div>
@@ -65,15 +77,24 @@
             </div>
             <div class="selected-gate-info" id="selectedGateInfo">
                 <h4>✓ <span id="selectedGateName"></span></h4>
-                <p>Scroll wheel to rotate<br>DEL to delete • Drag to move</p>
+                <p class="desktop-only">Scroll wheel to rotate<br>DEL to delete • Drag to move</p>
+                <p class="mobile-only">Use buttons below to rotate<br>Tap delete • Drag to move</p>
                 <div class="rotation-display">Angle: <span id="gateAngle">0°</span></div>
+                <div class="mobile-gate-actions mobile-only">
+                    <button class="btn btn-small btn-secondary" id="rotateLeftBtn">↺ -15°</button>
+                    <button class="btn btn-small btn-secondary" id="rotateRightBtn">↻ +15°</button>
+                    <button class="btn btn-small btn-danger" id="deleteGateBtn">🗑</button>
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="ui-overlay controls-panel">
+    <div class="ui-overlay controls-panel" id="controlsPanel">
         <div class="panel">
-            <div class="panel-title">Track Controls</div>
+            <div class="panel-header">
+                <div class="panel-title">Track Controls</div>
+                <button class="panel-close-btn" id="closeControlsPanel" aria-label="Close">×</button>
+            </div>
             <button class="btn btn-primary" id="lockTrackBtn"><span>🔒</span> Lock Layout</button>
             <button class="btn btn-success" id="drawPathBtn" disabled><span>✏️</span> Draw Flight Path</button>
             <button class="btn btn-magenta" id="animateBtn" disabled><span>▶</span> Animate Drone</button>
@@ -107,7 +128,7 @@
         </div>
     </div>
 
-    <div class="ui-overlay instructions">
+    <div class="ui-overlay instructions desktop-only">
         <div class="panel">
             <div class="panel-title">Controls</div>
             <div class="instruction-item"><span class="key">LMB</span><span>Select/drag gates</span></div>
@@ -120,6 +141,39 @@
             <div class="instruction-item"><span class="key">Drag</span><span>Trace flight path</span></div>
             <div class="instruction-item"><span class="key">Scroll</span><span>Adjust altitude</span></div>
         </div>
+    </div>
+
+    <!-- Mobile Touch Instructions (shows briefly on load) -->
+    <div class="mobile-touch-hint mobile-only" id="touchHint">
+        <div class="touch-hint-content">
+            <p><strong>Touch Controls:</strong></p>
+            <p>👆 Tap to select • 👆👆 Two fingers to rotate view</p>
+            <p>🤏 Pinch to zoom • ✋ Drag to pan</p>
+        </div>
+    </div>
+
+    <!-- Mobile Quick Actions Bar -->
+    <div class="mobile-quick-bar mobile-only" id="mobileQuickBar">
+        <button class="quick-btn" id="quickGatesBtn" title="Gates">
+            <span>⊞</span>
+            <small>Gates</small>
+        </button>
+        <button class="quick-btn" id="quickLockBtn" title="Lock">
+            <span>🔒</span>
+            <small>Lock</small>
+        </button>
+        <button class="quick-btn" id="quickPathBtn" title="Path" disabled>
+            <span>✏️</span>
+            <small>Path</small>
+        </button>
+        <button class="quick-btn" id="quickPlayBtn" title="Play" disabled>
+            <span>▶</span>
+            <small>Play</small>
+        </button>
+        <button class="quick-btn" id="quickControlsBtn" title="More">
+            <span>⚙️</span>
+            <small>More</small>
+        </button>
     </div>
 
     <!-- Modals -->

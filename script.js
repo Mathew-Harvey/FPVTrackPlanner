@@ -14,6 +14,18 @@
         let lastPathPoint = null; // NEW: track last point for distance check
         const MIN_POINT_DISTANCE = 0.8; // NEW: minimum distance between path points
 
+        // Touch state for mobile support
+        const touchState = {
+            touches: [],
+            lastTouchDistance: 0,
+            lastTouchAngle: 0,
+            isTwoFingerGesture: false,
+            touchStartTime: 0,
+            lastTapTime: 0,
+            tapCount: 0
+        };
+        let isMobile = false;
+
         const cameraState = {
             isRotating: false, isPanning: false,
             prevMouseX: 0, prevMouseY: 0,
@@ -472,6 +484,9 @@
         function setupEventListeners() {
             const canvas = renderer.domElement;
             
+            // Detect mobile device
+            isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || window.innerWidth <= 768;
+            
             document.querySelectorAll('.gate-item').forEach(item => {
                 item.addEventListener('click', () => {
                     if (isLocked) { showNotification('Unlock to add gates', true); return; }
@@ -479,15 +494,23 @@
                     const gate = createGate(item.dataset.gate, new THREE.Vector3((Math.random()-0.5)*25, 0, (Math.random()-0.5)*25));
                     selectGate(gate);
                     showNotification(`Added ${item.dataset.gate} gate`);
+                    if (isMobile) closeMobilePanels(); // Close panel after adding on mobile
                 });
             });
 
+            // Mouse events
             canvas.addEventListener('mousedown', onMouseDown);
             canvas.addEventListener('mousemove', onMouseMove);
             canvas.addEventListener('mouseup', onMouseUp);
             canvas.addEventListener('wheel', onWheel, { passive: false });
             canvas.addEventListener('contextmenu', e => e.preventDefault());
             canvas.addEventListener('dblclick', onDoubleClick);
+            
+            // Touch events for mobile
+            canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+            canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+            canvas.addEventListener('touchend', onTouchEnd, { passive: false });
+            canvas.addEventListener('touchcancel', onTouchEnd, { passive: false });
             
             document.addEventListener('keydown', onKeyDown);
             
@@ -514,6 +537,7 @@
                 camera.aspect = window.innerWidth / window.innerHeight;
                 camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
+                isMobile = window.innerWidth <= 768;
             });
 
             // Close modals on escape or click outside
@@ -521,7 +545,324 @@
                 modal.addEventListener('click', e => { if (e.target === modal) closeModal(modal.id); });
             });
 
+            // Setup mobile UI
+            setupMobileUI();
+
             saveState();
+        }
+
+        // ========== MOBILE UI ==========
+        function setupMobileUI() {
+            // Mobile menu toggle buttons
+            const gatesMenuBtn = document.getElementById('gatesMenuBtn');
+            const controlsMenuBtn = document.getElementById('controlsMenuBtn');
+            const gatesPanel = document.getElementById('gatesPanel');
+            const controlsPanel = document.getElementById('controlsPanel');
+            const panelOverlay = document.getElementById('panelOverlay');
+            const closeGatesBtn = document.getElementById('closeGatesPanel');
+            const closeControlsBtn = document.getElementById('closeControlsPanel');
+            
+            // Menu toggle handlers
+            gatesMenuBtn?.addEventListener('click', () => toggleMobilePanel('gates'));
+            controlsMenuBtn?.addEventListener('click', () => toggleMobilePanel('controls'));
+            closeGatesBtn?.addEventListener('click', () => closeMobilePanels());
+            closeControlsBtn?.addEventListener('click', () => closeMobilePanels());
+            panelOverlay?.addEventListener('click', () => closeMobilePanels());
+            
+            // Mobile quick bar buttons
+            const quickGatesBtn = document.getElementById('quickGatesBtn');
+            const quickLockBtn = document.getElementById('quickLockBtn');
+            const quickPathBtn = document.getElementById('quickPathBtn');
+            const quickPlayBtn = document.getElementById('quickPlayBtn');
+            const quickControlsBtn = document.getElementById('quickControlsBtn');
+            
+            quickGatesBtn?.addEventListener('click', () => toggleMobilePanel('gates'));
+            quickLockBtn?.addEventListener('click', toggleLock);
+            quickPathBtn?.addEventListener('click', togglePathMode);
+            quickPlayBtn?.addEventListener('click', toggleAnimation);
+            quickControlsBtn?.addEventListener('click', () => toggleMobilePanel('controls'));
+            
+            // Mobile gate rotation buttons
+            const rotateLeftBtn = document.getElementById('rotateLeftBtn');
+            const rotateRightBtn = document.getElementById('rotateRightBtn');
+            const deleteGateBtn = document.getElementById('deleteGateBtn');
+            
+            rotateLeftBtn?.addEventListener('click', () => {
+                if (selectedGate) {
+                    selectedGate.rotation.y -= Math.PI / 12; // -15 degrees
+                    updateGateAngleDisplay();
+                    showNotification('Rotated -15°');
+                }
+            });
+            
+            rotateRightBtn?.addEventListener('click', () => {
+                if (selectedGate) {
+                    selectedGate.rotation.y += Math.PI / 12; // +15 degrees
+                    updateGateAngleDisplay();
+                    showNotification('Rotated +15°');
+                }
+            });
+            
+            deleteGateBtn?.addEventListener('click', () => {
+                if (selectedGate && !isLocked) {
+                    saveState();
+                    deleteSelectedGate();
+                }
+            });
+            
+            // Show touch hint on mobile
+            if (isMobile) {
+                showTouchHint();
+            }
+        }
+        
+        function toggleMobilePanel(panel) {
+            const gatesPanel = document.getElementById('gatesPanel');
+            const controlsPanel = document.getElementById('controlsPanel');
+            const panelOverlay = document.getElementById('panelOverlay');
+            
+            if (panel === 'gates') {
+                const isOpen = gatesPanel.classList.contains('open');
+                closeMobilePanels();
+                if (!isOpen) {
+                    gatesPanel.classList.add('open');
+                    panelOverlay.classList.add('show');
+                }
+            } else if (panel === 'controls') {
+                const isOpen = controlsPanel.classList.contains('open');
+                closeMobilePanels();
+                if (!isOpen) {
+                    controlsPanel.classList.add('open');
+                    panelOverlay.classList.add('show');
+                }
+            }
+        }
+        
+        function closeMobilePanels() {
+            document.getElementById('gatesPanel')?.classList.remove('open');
+            document.getElementById('controlsPanel')?.classList.remove('open');
+            document.getElementById('panelOverlay')?.classList.remove('show');
+        }
+        
+        function updateMobileQuickBar() {
+            const quickLockBtn = document.getElementById('quickLockBtn');
+            const quickPathBtn = document.getElementById('quickPathBtn');
+            const quickPlayBtn = document.getElementById('quickPlayBtn');
+            
+            if (quickLockBtn) {
+                quickLockBtn.innerHTML = isLocked ? '<span>🔓</span><small>Unlock</small>' : '<span>🔒</span><small>Lock</small>';
+                quickLockBtn.classList.toggle('active', isLocked);
+            }
+            if (quickPathBtn) {
+                quickPathBtn.disabled = !isLocked;
+                quickPathBtn.classList.toggle('active', isPathMode);
+                quickPathBtn.innerHTML = isPathMode ? '<span>✓</span><small>Done</small>' : '<span>✏️</span><small>Path</small>';
+            }
+            if (quickPlayBtn) {
+                quickPlayBtn.disabled = pathPoints.length < 2;
+                quickPlayBtn.classList.toggle('active', isAnimating);
+                quickPlayBtn.innerHTML = isAnimating ? '<span>⏹</span><small>Stop</small>' : '<span>▶</span><small>Play</small>';
+            }
+        }
+        
+        function showTouchHint() {
+            const hint = document.getElementById('touchHint');
+            if (hint && !localStorage.getItem('fpvTouchHintShown')) {
+                hint.classList.add('show');
+                setTimeout(() => {
+                    hint.classList.remove('show');
+                    localStorage.setItem('fpvTouchHintShown', 'true');
+                }, 4000);
+            }
+        }
+
+        // ========== TOUCH EVENTS ==========
+        function onTouchStart(e) {
+            e.preventDefault();
+            const touches = e.touches;
+            touchState.touches = Array.from(touches);
+            touchState.touchStartTime = Date.now();
+            
+            if (touches.length === 1) {
+                // Single touch - similar to mouse left click
+                const touch = touches[0];
+                touchState.isTwoFingerGesture = false;
+                
+                mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+                
+                // Path drawing mode
+                if (isPathMode) {
+                    const hit = raycaster.intersectObject(groundPlane);
+                    if (hit.length) {
+                        isDrawingPath = true;
+                        saveState();
+                        const pt = hit[0].point.clone();
+                        pt.y = currentPathHeight;
+                        pathPoints.push(pt);
+                        lastPathPoint = pt.clone();
+                        updatePathVisualization();
+                        document.getElementById('animateBtn').disabled = pathPoints.length < 2;
+                        updateMobileQuickBar();
+                    }
+                    return;
+                }
+                
+                if (isLocked) return;
+                
+                // Check for gate selection
+                const gateObjs = [];
+                gates.forEach(g => g.traverse(c => { if (c.isMesh) gateObjs.push(c); }));
+                const hits = raycaster.intersectObjects(gateObjs);
+                
+                if (hits.length) {
+                    let obj = hits[0].object;
+                    while (obj.parent && !obj.userData.isGate) obj = obj.parent;
+                    if (obj.userData.isGate) {
+                        selectGate(obj);
+                        isDragging = true;
+                        saveState();
+                        const planeHit = new THREE.Vector3();
+                        raycaster.ray.intersectPlane(dragPlane, planeHit);
+                        offset.copy(planeHit).sub(obj.position);
+                    }
+                } else {
+                    deselectGate();
+                }
+                
+                cameraState.prevMouseX = touch.clientX;
+                cameraState.prevMouseY = touch.clientY;
+                
+            } else if (touches.length === 2) {
+                // Two finger gesture - stop dragging, prepare for pinch/rotate
+                isDragging = false;
+                isDrawingPath = false;
+                touchState.isTwoFingerGesture = true;
+                
+                const dx = touches[0].clientX - touches[1].clientX;
+                const dy = touches[0].clientY - touches[1].clientY;
+                touchState.lastTouchDistance = Math.sqrt(dx * dx + dy * dy);
+                touchState.lastTouchAngle = Math.atan2(dy, dx);
+                
+                // Center point for camera rotation
+                cameraState.prevMouseX = (touches[0].clientX + touches[1].clientX) / 2;
+                cameraState.prevMouseY = (touches[0].clientY + touches[1].clientY) / 2;
+            }
+        }
+        
+        function onTouchMove(e) {
+            e.preventDefault();
+            const touches = e.touches;
+            
+            if (touches.length === 1 && !touchState.isTwoFingerGesture) {
+                const touch = touches[0];
+                
+                mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+                
+                // Path drawing
+                if (isPathMode && isDrawingPath) {
+                    raycaster.setFromCamera(mouse, camera);
+                    const hit = raycaster.intersectObject(groundPlane);
+                    if (hit.length && lastPathPoint) {
+                        const newPoint = new THREE.Vector3(hit[0].point.x, currentPathHeight, hit[0].point.z);
+                        const dist = newPoint.distanceTo(lastPathPoint);
+                        
+                        if (dist >= MIN_POINT_DISTANCE) {
+                            pathPoints.push(newPoint);
+                            lastPathPoint = newPoint.clone();
+                            updatePathVisualization();
+                            document.getElementById('animateBtn').disabled = pathPoints.length < 2;
+                            updateMobileQuickBar();
+                        }
+                    }
+                    return;
+                }
+                
+                // Dragging gate
+                if (isDragging && selectedGate && !isLocked) {
+                    raycaster.setFromCamera(mouse, camera);
+                    const planeHit = new THREE.Vector3();
+                    raycaster.ray.intersectPlane(dragPlane, planeHit);
+                    selectedGate.position.x = Math.round((planeHit.x - offset.x) * 2) / 2;
+                    selectedGate.position.z = Math.round((planeHit.z - offset.z) * 2) / 2;
+                    return;
+                }
+                
+                // Single finger camera pan (when not dragging)
+                if (!isDragging && !isPathMode) {
+                    const spd = cameraState.radius * 0.002;
+                    cameraState.target.x -= (touch.clientX - cameraState.prevMouseX) * spd;
+                    cameraState.target.z += (touch.clientY - cameraState.prevMouseY) * spd;
+                    cameraState.prevMouseX = touch.clientX;
+                    cameraState.prevMouseY = touch.clientY;
+                    updateCamera();
+                }
+                
+            } else if (touches.length === 2) {
+                touchState.isTwoFingerGesture = true;
+                
+                const dx = touches[0].clientX - touches[1].clientX;
+                const dy = touches[0].clientY - touches[1].clientY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const angle = Math.atan2(dy, dx);
+                
+                // Pinch to zoom
+                if (touchState.lastTouchDistance > 0) {
+                    const scale = touchState.lastTouchDistance / distance;
+                    cameraState.radius = Math.max(15, Math.min(100, cameraState.radius * scale));
+                }
+                
+                // Two finger rotation (camera orbit)
+                const centerX = (touches[0].clientX + touches[1].clientX) / 2;
+                const centerY = (touches[0].clientY + touches[1].clientY) / 2;
+                
+                cameraState.theta -= (centerX - cameraState.prevMouseX) * 0.008;
+                cameraState.phi = Math.max(0.15, Math.min(Math.PI/2.1, cameraState.phi + (centerY - cameraState.prevMouseY) * 0.008));
+                
+                touchState.lastTouchDistance = distance;
+                touchState.lastTouchAngle = angle;
+                cameraState.prevMouseX = centerX;
+                cameraState.prevMouseY = centerY;
+                
+                updateCamera();
+            }
+        }
+        
+        function onTouchEnd(e) {
+            e.preventDefault();
+            
+            // Stop path drawing
+            if (isDrawingPath) {
+                isDrawingPath = false;
+                lastPathPoint = null;
+                if (pathPoints.length > 1) {
+                    showNotification(`Path traced: ${pathPoints.length} points`);
+                }
+            }
+            
+            // Check for tap (short touch without much movement)
+            const touchDuration = Date.now() - touchState.touchStartTime;
+            if (touchDuration < 200 && !touchState.isTwoFingerGesture && e.changedTouches.length === 1) {
+                // This was a tap - could implement double-tap here
+                const now = Date.now();
+                if (now - touchState.lastTapTime < 300) {
+                    touchState.tapCount++;
+                    if (touchState.tapCount >= 2) {
+                        // Double tap - maybe zoom in or reset view
+                        touchState.tapCount = 0;
+                    }
+                } else {
+                    touchState.tapCount = 1;
+                }
+                touchState.lastTapTime = now;
+            }
+            
+            isDragging = false;
+            touchState.isTwoFingerGesture = false;
+            touchState.lastTouchDistance = 0;
+            touchState.touches = [];
         }
 
         function onMouseDown(e) {
@@ -849,6 +1190,7 @@
                 if (isPathMode) togglePathMode();
                 showNotification('Layout unlocked');
             }
+            updateMobileQuickBar();
         }
 
         function togglePathMode() {
@@ -862,7 +1204,7 @@
                 badge.textContent = 'Drawing Path'; badge.className = 'mode-badge path-mode';
                 renderer.domElement.style.cursor = 'crosshair';
                 if (pathCursor) pathCursor.visible = true;
-                showNotification('Hold LMB + drag to trace path • Scroll for height');
+                showNotification(isMobile ? 'Drag to trace path' : 'Hold LMB + drag to trace path • Scroll for height');
             } else {
                 btn.innerHTML = '<span>✏️</span> Draw Flight Path';
                 btn.classList.replace('btn-secondary', 'btn-success');
@@ -873,6 +1215,7 @@
                 lastPathPoint = null;
                 if (pathPoints.length) showNotification(`Path: ${pathPoints.length} waypoints`);
             }
+            updateMobileQuickBar();
         }
 
         function toggleAnimation() {
@@ -880,6 +1223,7 @@
             const btn = document.getElementById('animateBtn');
             if (isAnimating) { btn.innerHTML = '<span>⏹</span> Stop'; animateDrone(); }
             else { btn.innerHTML = '<span>▶</span> Animate Drone'; if (drone) { scene.remove(drone); drone = null; } }
+            updateMobileQuickBar();
         }
 
         function clearPath() {
@@ -890,6 +1234,7 @@
             document.getElementById('animateBtn').disabled = true;
             document.getElementById('clearPathBtn').disabled = true;
             showNotification('Path cleared');
+            updateMobileQuickBar();
         }
 
         // ========== MODALS ==========

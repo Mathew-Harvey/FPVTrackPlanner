@@ -786,7 +786,202 @@ body {
     opacity: 1;
 }
 
-/* ==================== RESPONSIVE ==================== */
+/* ==================== MOBILE MENU BUTTON ==================== */
+.mobile-menu-btn {
+    display: none;
+    width: 40px;
+    height: 40px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid var(--wcmrc-teal);
+    border-radius: 8px;
+    color: var(--wcmrc-teal-light);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.mobile-menu-btn:hover,
+.mobile-menu-btn:active {
+    background: var(--wcmrc-teal);
+    color: var(--wcmrc-white);
+}
+
+.mobile-menu-btn svg {
+    width: 100%;
+    height: 100%;
+    fill: none;
+}
+
+/* ==================== PANEL HEADER ==================== */
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0;
+}
+
+.panel-header .panel-title {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+    flex: 1;
+}
+
+.panel-header .panel-title::after {
+    display: none;
+}
+
+.panel-close-btn {
+    display: none;
+    width: 32px;
+    height: 32px;
+    background: var(--wcmrc-gray-light);
+    border: none;
+    border-radius: 50%;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-medium);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.panel-close-btn:hover {
+    background: var(--wcmrc-red);
+    color: var(--wcmrc-white);
+}
+
+/* Panel underline - added separately when header is used */
+.panel-header + .gate-item,
+.panel-header + .btn,
+.panel-header + .divider {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 2px solid var(--wcmrc-teal);
+}
+
+/* ==================== MOBILE GATE ACTIONS ==================== */
+.mobile-gate-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.mobile-gate-actions .btn {
+    flex: 1;
+    margin-bottom: 0;
+    padding: 8px 6px;
+    font-size: 0.7rem;
+}
+
+/* ==================== MOBILE TOUCH HINT ==================== */
+.mobile-touch-hint {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 150;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.4s ease;
+    pointer-events: none;
+}
+
+.mobile-touch-hint.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.touch-hint-content {
+    background: var(--panel-bg);
+    border: 1px solid var(--wcmrc-teal);
+    border-radius: 12px;
+    padding: 12px 16px;
+    text-align: center;
+    box-shadow: var(--panel-shadow);
+}
+
+.touch-hint-content p {
+    font-size: 0.75rem;
+    color: var(--text-dark);
+    margin: 4px 0;
+}
+
+.touch-hint-content p:first-child {
+    margin-top: 0;
+}
+
+.touch-hint-content p:last-child {
+    margin-bottom: 0;
+}
+
+/* ==================== MOBILE QUICK BAR ==================== */
+.mobile-quick-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: none;
+    justify-content: space-around;
+    align-items: center;
+    padding: 8px 12px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    background: var(--header-gradient);
+    border-top: 2px solid var(--wcmrc-teal);
+    z-index: 120;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.quick-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    color: var(--wcmrc-gray);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 8px;
+    min-width: 56px;
+}
+
+.quick-btn:not(:disabled):hover,
+.quick-btn:not(:disabled):active,
+.quick-btn.active {
+    background: rgba(41, 182, 246, 0.2);
+    color: var(--wcmrc-teal-light);
+}
+
+.quick-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.quick-btn span {
+    font-size: 1.3rem;
+}
+
+.quick-btn small {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ==================== VISIBILITY CLASSES ==================== */
+.desktop-only {
+    display: block;
+}
+
+.mobile-only {
+    display: none !important;
+}
+
+/* ==================== RESPONSIVE - TABLET ==================== */
 @media (max-width: 900px) {
     .instructions {
         display: none;
@@ -801,46 +996,123 @@ body {
     }
 }
 
-@media (max-width: 600px) {
+/* ==================== RESPONSIVE - MOBILE ==================== */
+@media (max-width: 768px) {
+    /* Show/hide mobile vs desktop elements */
+    .desktop-only {
+        display: none !important;
+    }
+    
+    .mobile-only {
+        display: block !important;
+    }
+    
+    /* Header adjustments */
     .header {
-        padding: 8px 14px;
+        padding: 8px 12px;
+        gap: 8px;
+    }
+    
+    .mobile-menu-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
     
     .logo-text h1 {
-        font-size: 1.2rem;
+        font-size: 1rem;
+        letter-spacing: 1px;
+    }
+    
+    .logo-text span {
+        display: none;
     }
     
     .logo-icon {
-        width: 38px;
-        height: 38px;
+        width: 36px;
+        height: 36px;
     }
     
+    .logo-icon svg {
+        width: 20px;
+        height: 20px;
+    }
+    
+    .mode-badge {
+        padding: 5px 10px;
+        font-size: 0.65rem;
+        letter-spacing: 1px;
+    }
+    
+    /* Collapsible panels */
     .gates-panel,
     .controls-panel {
-        width: 150px;
-        top: 62px;
+        position: fixed;
+        top: 60px;
+        width: 280px;
+        max-width: calc(100vw - 24px);
+        max-height: calc(100vh - 140px);
+        transform: translateX(-110%);
+        transition: transform 0.3s ease;
+        z-index: 110;
     }
     
+    .gates-panel {
+        left: 12px;
+    }
+    
+    .controls-panel {
+        right: 12px;
+        left: auto;
+        transform: translateX(110%);
+    }
+    
+    .gates-panel.open {
+        transform: translateX(0);
+    }
+    
+    .controls-panel.open {
+        transform: translateX(0);
+    }
+    
+    .panel-close-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    /* Panel content adjustments */
     .panel {
-        padding: 10px;
+        padding: 14px;
     }
     
     .gate-item {
-        padding: 8px;
+        padding: 12px;
+        margin-bottom: 8px;
     }
     
     .gate-icon {
-        width: 30px;
-        height: 30px;
-        font-size: 0.9rem;
+        width: 40px;
+        height: 40px;
+        font-size: 1.2rem;
     }
     
-    .btn {
-        padding: 9px 12px;
+    .gate-info h3 {
+        font-size: 0.95rem;
+    }
+    
+    .gate-info span {
         font-size: 0.75rem;
     }
     
+    .btn {
+        padding: 12px 14px;
+        font-size: 0.85rem;
+    }
+    
+    /* Bottom controls - adjust for quick bar */
     .bottom-controls {
+        bottom: 70px;
         flex-wrap: wrap;
         gap: 8px;
         width: calc(100% - 24px);
@@ -849,15 +1121,157 @@ body {
     
     .control-group {
         padding: 10px 14px;
+        border-radius: 20px;
+    }
+    
+    .control-group label {
+        font-size: 0.65rem;
     }
     
     .slider {
-        width: 70px;
+        width: 60px;
+    }
+    
+    .slider-value {
+        font-size: 0.75rem;
+        min-width: 30px;
+    }
+    
+    /* Show mobile quick bar */
+    .mobile-quick-bar {
+        display: flex;
+    }
+    
+    /* Notification adjustment */
+    .notification {
+        top: auto;
+        bottom: 140px;
+        max-width: calc(100% - 40px);
+    }
+    
+    /* Modal adjustments for mobile */
+    .modal {
+        max-height: calc(100vh - 100px);
+        overflow-y: auto;
+        margin: 20px;
+    }
+    
+    .modal-buttons {
+        flex-wrap: wrap;
+    }
+    
+    .modal-buttons .btn {
+        min-width: 100px;
+    }
+    
+    /* Panel overlay when open */
+    .panel-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 105;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s ease;
+    }
+    
+    .panel-overlay.show {
+        opacity: 1;
+        visibility: visible;
+    }
+}
+
+/* ==================== RESPONSIVE - SMALL MOBILE ==================== */
+@media (max-width: 400px) {
+    .header {
+        padding: 6px 8px;
+    }
+    
+    .logo-text h1 {
+        font-size: 0.85rem;
+    }
+    
+    .mobile-menu-btn {
+        width: 36px;
+        height: 36px;
     }
     
     .mode-badge {
-        padding: 6px 14px;
-        font-size: 0.75rem;
+        padding: 4px 8px;
+        font-size: 0.6rem;
+    }
+    
+    .gates-panel,
+    .controls-panel {
+        width: calc(100vw - 24px);
+        max-height: calc(100vh - 120px);
+    }
+    
+    .bottom-controls {
+        bottom: 65px;
+    }
+    
+    .control-group {
+        padding: 8px 10px;
+        flex: 1;
+        justify-content: center;
+    }
+    
+    .quick-btn {
+        padding: 6px 8px;
+        min-width: 48px;
+    }
+    
+    .quick-btn span {
+        font-size: 1.1rem;
+    }
+    
+    .quick-btn small {
+        font-size: 0.55rem;
+    }
+}
+
+/* ==================== TOUCH DEVICE OPTIMIZATIONS ==================== */
+@media (hover: none) and (pointer: coarse) {
+    /* Larger touch targets */
+    .btn {
+        min-height: 44px;
+    }
+    
+    .gate-item {
+        min-height: 54px;
+    }
+    
+    .slider::-webkit-slider-thumb {
+        width: 24px;
+        height: 24px;
+    }
+    
+    .slider::-moz-range-thumb {
+        width: 24px;
+        height: 24px;
+    }
+    
+    /* Disable hover effects that don't work on touch */
+    .gate-item:hover {
+        transform: none;
+    }
+    
+    .btn:hover:not(:disabled) {
+        transform: none;
+    }
+    
+    /* Active states for touch feedback */
+    .gate-item:active {
+        background: var(--wcmrc-sky);
+        border-color: var(--wcmrc-teal);
+    }
+    
+    .btn:active:not(:disabled) {
+        transform: scale(0.98);
     }
 }
 
