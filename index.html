@@ -105,6 +105,7 @@
             <button class="btn btn-secondary" id="saveBtn"><span>💾</span> Save Track</button>
             <button class="btn btn-secondary" id="loadBtn"><span>📂</span> Load Track</button>
             <button class="btn btn-secondary" id="shareBtn"><span>🔗</span> Share Track</button>
+            <button class="btn btn-secondary" id="exportImgBtn"><span>🖼️</span> Export Image</button>
             <div class="divider"></div>
             <button class="btn btn-danger btn-small" id="clearBtn"><span>🗑</span> Clear All</button>
             <div class="track-info">
@@ -205,12 +206,18 @@
     <div class="modal-overlay" id="shareModal">
         <div class="modal">
             <h2>🔗 Share Track</h2>
-            <p>Copy and share with club members:</p>
-            <textarea id="shareData" readonly style="font-size:0.7rem;height:100px;"></textarea>
+            <p><strong>Share Link</strong> — Anyone with this link will see your track with the drone flying:</p>
+            <div class="share-url-container">
+                <input type="text" id="shareUrl" readonly class="share-url-input">
+                <button class="btn btn-primary share-copy-btn" onclick="copyShareUrl()">📋 Copy Link</button>
+            </div>
+            <div class="divider"></div>
+            <p style="font-size:0.8rem;color:var(--text-medium);">Or copy raw JSON data:</p>
+            <textarea id="shareData" readonly style="font-size:0.65rem;height:80px;"></textarea>
             <div class="modal-buttons">
                 <button class="btn btn-secondary" onclick="closeModal('shareModal')">Close</button>
                 <button class="btn btn-secondary" onclick="downloadTrack()">⬇ Download</button>
-                <button class="btn btn-primary" onclick="copyShareData()">📋 Copy</button>
+                <button class="btn btn-secondary" onclick="copyShareData()">📋 Copy JSON</button>
             </div>
         </div>
     </div>

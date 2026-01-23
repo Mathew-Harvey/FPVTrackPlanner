@@ -687,6 +687,38 @@ body {
     margin-bottom: 0;
 }
 
+/* Share URL Container */
+.share-url-container {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.share-url-input {
+    flex: 1;
+    padding: 12px 14px;
+    background: var(--wcmrc-gray-light);
+    border: 2px solid var(--wcmrc-teal);
+    border-radius: 8px;
+    color: var(--text-dark);
+    font-family: 'Exo 2', monospace;
+    font-size: 0.8rem;
+    min-width: 0;
+    text-overflow: ellipsis;
+}
+
+.share-url-input:focus {
+    outline: none;
+    background: var(--wcmrc-white);
+}
+
+.share-copy-btn {
+    flex-shrink: 0;
+    width: auto !important;
+    padding: 12px 16px !important;
+    margin-bottom: 0 !important;
+}
+
 /* ==================== NOTIFICATION ==================== */
 .notification {
     position: fixed;
@@ -1162,6 +1194,15 @@ body {
     
     .modal-buttons .btn {
         min-width: 100px;
+    }
+    
+    /* Share URL on mobile */
+    .share-url-container {
+        flex-direction: column;
+    }
+    
+    .share-copy-btn {
+        width: 100% !important;
     }
     
     /* Panel overlay when open */

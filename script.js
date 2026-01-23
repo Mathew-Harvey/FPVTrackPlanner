@@ -522,6 +522,7 @@
             document.getElementById('saveBtn').addEventListener('click', () => openModal('saveModal'));
             document.getElementById('loadBtn').addEventListener('click', () => openModal('loadModal'));
             document.getElementById('shareBtn').addEventListener('click', showShareModal);
+            document.getElementById('exportImgBtn').addEventListener('click', exportTrackImage);
             document.getElementById('clearBtn').addEventListener('click', () => { if (confirm('Clear all?')) clearAll(); });
 
             document.getElementById('speedSlider').addEventListener('input', e => {
@@ -1262,16 +1263,8 @@
         function loadTrack() {
             try {
                 const track = JSON.parse(document.getElementById('loadData').value);
-                clearAll(true);
-                track.gates.forEach(g => createGate(g.type, new THREE.Vector3(g.position.x, g.position.y, g.position.z), g.rotation || 0));
-                if (track.pathPoints?.length) {
-                    pathPoints = track.pathPoints.map(p => new THREE.Vector3(p.x, p.y, p.z));
-                    updatePathVisualization();
-                    document.getElementById('animateBtn').disabled = pathPoints.length < 2;
-                }
-                saveState();
+                loadTrackData(track, false);
                 closeModal('loadModal');
-                showNotification(`Loaded: ${track.name}`);
             } catch (e) { console.warn('Load failed:', e); showNotification('Invalid data', true); }
         }
 
@@ -1281,13 +1274,66 @@
                 pathPoints: pathPoints.map(p => ({x:+p.x.toFixed(2), y:+p.y.toFixed(2), z:+p.z.toFixed(2)}))
             };
             document.getElementById('shareData').value = JSON.stringify(data, null, 2);
+            
+            // Generate shareable URL
+            const shareUrl = generateShareUrl(data);
+            document.getElementById('shareUrl').value = shareUrl;
+            
             openModal('shareModal');
+        }
+
+        function generateShareUrl(data) {
+            // Compress track data for URL
+            const compactData = {
+                n: data.name,
+                g: data.gates.map(g => ({
+                    t: g.type[0], // First letter of type (s=square, a=arch, l=ladder, h=hurdle, d=dive, f=flag)
+                    p: [g.position.x, g.position.y, g.position.z],
+                    r: g.rotation
+                })),
+                p: data.pathPoints.map(pt => [pt.x, pt.y, pt.z])
+            };
+            
+            const jsonStr = JSON.stringify(compactData);
+            const encoded = btoa(encodeURIComponent(jsonStr));
+            const baseUrl = window.location.origin + window.location.pathname;
+            return baseUrl + '?share=' + encoded;
+        }
+
+        function decodeShareData(encoded) {
+            try {
+                const jsonStr = decodeURIComponent(atob(encoded));
+                const compactData = JSON.parse(jsonStr);
+                
+                // Type mapping from first letter back to full type
+                const typeMap = { s: 'square', a: 'arch', l: 'ladder', h: 'hurdle', d: 'dive', f: 'flag' };
+                
+                return {
+                    name: compactData.n || 'Shared Track',
+                    gates: compactData.g.map(g => ({
+                        type: typeMap[g.t] || 'square',
+                        position: { x: g.p[0], y: g.p[1], z: g.p[2] },
+                        rotation: g.r || 0
+                    })),
+                    pathPoints: compactData.p.map(pt => ({ x: pt[0], y: pt[1], z: pt[2] }))
+                };
+            } catch (e) {
+                console.error('Failed to decode share data:', e);
+                return null;
+            }
         }
 
         function copyShareData() {
             navigator.clipboard.writeText(document.getElementById('shareData').value)
-                .then(() => showNotification('Copied!'))
-                .catch(() => { document.getElementById('shareData').select(); document.execCommand('copy'); showNotification('Copied!'); });
+                .then(() => showNotification('JSON copied!'))
+                .catch(() => { document.getElementById('shareData').select(); document.execCommand('copy'); showNotification('JSON copied!'); });
+        }
+
+        function copyShareUrl() {
+            const urlInput = document.getElementById('shareUrl');
+            navigator.clipboard.writeText(urlInput.value)
+                .then(() => showNotification('Link copied! Share it with anyone.'))
+                .catch(() => { urlInput.select(); document.execCommand('copy'); showNotification('Link copied!'); });
         }
 
         function downloadTrack() {
@@ -1299,12 +1345,462 @@
             showNotification('Downloaded!');
         }
 
+        // ========== EXPORT IMAGE ==========
+        function exportTrackImage() {
+            if (gates.length === 0 && pathPoints.length === 0) {
+                showNotification('Nothing to export', true);
+                return;
+            }
+
+            showNotification('Generating image...');
+
+            // A4 dimensions at 150 DPI (reasonable quality for web)
+            const A4_WIDTH = 1754;  // 297mm at 150 DPI (landscape)
+            const A4_HEIGHT = 1240; // 210mm at 150 DPI
+            const PADDING = 80; // Padding in pixels
+
+            // Create a separate renderer for export
+            const exportRenderer = new THREE.WebGLRenderer({ 
+                antialias: true, 
+                preserveDrawingBuffer: true,
+                alpha: false
+            });
+            exportRenderer.setSize(A4_WIDTH, A4_HEIGHT);
+            exportRenderer.setPixelRatio(1);
+            exportRenderer.shadowMap.enabled = true;
+            exportRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            exportRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+            exportRenderer.toneMappingExposure = 1.1;
+
+            // Calculate bounding box of all gates and path points
+            const bounds = calculateTrackBounds();
+            
+            // Create isometric orthographic camera
+            const isoCamera = createIsometricCamera(bounds, A4_WIDTH, A4_HEIGHT, PADDING);
+
+            // Store original background and fog
+            const originalBackground = scene.background;
+            const originalFog = scene.fog;
+
+            // Set white background for print
+            scene.background = new THREE.Color(0xffffff);
+            scene.fog = null;
+
+            // Hide UI elements that shouldn't be in the export
+            const pathCursorWasVisible = pathCursor ? pathCursor.visible : false;
+            if (pathCursor) pathCursor.visible = false;
+            
+            // Hide drone during export
+            const droneWasVisible = drone !== null;
+            if (drone) scene.remove(drone);
+
+            // Create temporary number labels for gates
+            const gateLabels = [];
+            gates.forEach((gate, index) => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 64;
+                canvas.height = 64;
+                const ctx = canvas.getContext('2d');
+                
+                // Draw circle background
+                ctx.fillStyle = '#ff6600';
+                ctx.beginPath();
+                ctx.arc(32, 32, 28, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                
+                // Draw number
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 32px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText((index + 1).toString(), 32, 34);
+                
+                const tex = new THREE.CanvasTexture(canvas);
+                const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex }));
+                sprite.scale.set(2, 2, 1);
+                sprite.position.copy(gate.position);
+                sprite.position.y += 5; // Position above gate
+                scene.add(sprite);
+                gateLabels.push(sprite);
+            });
+
+            // Render the scene
+            exportRenderer.render(scene, isoCamera);
+
+            // Remove temporary labels
+            gateLabels.forEach(label => scene.remove(label));
+
+            // Get the image data
+            const dataUrl = exportRenderer.domElement.toDataURL('image/png', 1.0);
+
+            // Create canvas for adding header/footer text
+            const finalCanvas = document.createElement('canvas');
+            finalCanvas.width = A4_WIDTH;
+            finalCanvas.height = A4_HEIGHT;
+            const ctx = finalCanvas.getContext('2d');
+
+            // Load rendered image and add text overlay
+            const img = new Image();
+            img.onload = () => {
+                // Draw the 3D render
+                ctx.drawImage(img, 0, 0);
+
+                // Add header
+                ctx.fillStyle = 'rgba(55, 71, 79, 0.95)';
+                ctx.fillRect(0, 0, A4_WIDTH, 70);
+                
+                ctx.fillStyle = '#29b6f6';
+                ctx.font = 'bold 32px "Bebas Neue", "Arial Black", sans-serif';
+                ctx.fillText('FPV TRACK DESIGNER', 30, 48);
+
+                const trackName = document.getElementById('trackName').value || 'Untitled Track';
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '24px "Exo 2", Arial, sans-serif';
+                ctx.fillText(trackName, 350, 46);
+
+                // Add "ISOMETRIC VIEW" label
+                ctx.fillStyle = 'rgba(41, 182, 246, 0.9)';
+                ctx.font = '16px "Bebas Neue", Arial, sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillText('ISOMETRIC VIEW', A4_WIDTH - 30, 48);
+                ctx.textAlign = 'left';
+
+                // Add footer with stats
+                ctx.fillStyle = 'rgba(55, 71, 79, 0.95)';
+                ctx.fillRect(0, A4_HEIGHT - 60, A4_WIDTH, 60);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '18px "Exo 2", Arial, sans-serif';
+                
+                const stats = [
+                    `Gates: ${gates.length}`,
+                    `Waypoints: ${pathPoints.length}`,
+                    `Track Length: ${pathPoints.length >= 2 ? Math.round(new THREE.CatmullRomCurve3(pathPoints, false, 'catmullrom', 0.5).getLength()) + 'm' : '0m'}`
+                ];
+                
+                ctx.fillText(stats.join('   |   '), 30, A4_HEIGHT - 24);
+
+                // Add date
+                const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                ctx.fillStyle = '#90a4ae';
+                ctx.textAlign = 'right';
+                ctx.fillText(date, A4_WIDTH - 30, A4_HEIGHT - 24);
+                ctx.textAlign = 'left';
+
+                // Add scale indicator
+                drawScaleIndicator(ctx, bounds, isoCamera, A4_WIDTH, A4_HEIGHT);
+
+                // Add compass/direction indicator
+                drawCompass(ctx, A4_WIDTH - 100, 150);
+
+                // Add gate legend
+                if (gates.length > 0) {
+                    drawGateLegend(ctx, A4_WIDTH, A4_HEIGHT);
+                }
+
+                // Download the final image
+                const finalDataUrl = finalCanvas.toDataURL('image/png', 1.0);
+                const link = document.createElement('a');
+                link.download = `fpv-track-${Date.now()}.png`;
+                link.href = finalDataUrl;
+                link.click();
+
+                showNotification('Track image exported!');
+            };
+            img.src = dataUrl;
+
+            // Restore original scene settings
+            scene.background = originalBackground;
+            scene.fog = originalFog;
+            if (pathCursor) pathCursor.visible = pathCursorWasVisible;
+            if (droneWasVisible && drone) scene.add(drone);
+
+            // Clean up
+            exportRenderer.dispose();
+        }
+
+        function drawGateLegend(ctx, canvasWidth, canvasHeight) {
+            const legendX = 30;
+            const legendY = 90;
+            const itemHeight = 22;
+            const maxItems = Math.min(gates.length, 12); // Show max 12 gates in legend
+            
+            // Background
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+            ctx.fillRect(legendX - 10, legendY - 10, 180, maxItems * itemHeight + 35);
+            
+            ctx.strokeStyle = '#37474f';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(legendX - 10, legendY - 10, 180, maxItems * itemHeight + 35);
+            
+            // Title
+            ctx.fillStyle = '#37474f';
+            ctx.font = 'bold 14px "Bebas Neue", Arial, sans-serif';
+            ctx.fillText('GATE LEGEND', legendX, legendY + 8);
+            
+            // Gates list
+            ctx.font = '12px "Exo 2", Arial, sans-serif';
+            for (let i = 0; i < maxItems; i++) {
+                const gate = gates[i];
+                const y = legendY + 28 + i * itemHeight;
+                
+                // Number circle
+                ctx.fillStyle = '#ff6600';
+                ctx.beginPath();
+                ctx.arc(legendX + 10, y - 3, 8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 10px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText((i + 1).toString(), legendX + 10, y);
+                ctx.textAlign = 'left';
+                
+                // Gate type
+                ctx.fillStyle = '#37474f';
+                ctx.font = '12px "Exo 2", Arial, sans-serif';
+                const typeLabel = gate.userData.type.charAt(0).toUpperCase() + gate.userData.type.slice(1);
+                ctx.fillText(typeLabel + ' Gate', legendX + 26, y);
+            }
+            
+            if (gates.length > maxItems) {
+                ctx.fillStyle = '#90a4ae';
+                ctx.font = 'italic 11px "Exo 2", Arial, sans-serif';
+                ctx.fillText(`+${gates.length - maxItems} more...`, legendX + 26, legendY + 28 + maxItems * itemHeight);
+            }
+        }
+
+        function calculateTrackBounds() {
+            const min = new THREE.Vector3(Infinity, Infinity, Infinity);
+            const max = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
+
+            // Include all gates
+            gates.forEach(gate => {
+                const box = new THREE.Box3().setFromObject(gate);
+                min.min(box.min);
+                max.max(box.max);
+            });
+
+            // Include all path points
+            pathPoints.forEach(pt => {
+                min.min(pt);
+                max.max(pt);
+            });
+
+            // Include path markers
+            pathMarkers.forEach(marker => {
+                if (marker.position) {
+                    min.min(marker.position);
+                    max.max(marker.position);
+                }
+            });
+
+            // If nothing found, use default bounds
+            if (min.x === Infinity) {
+                min.set(-20, 0, -20);
+                max.set(20, 10, 20);
+            }
+
+            // Add some padding to bounds
+            const padding = 5;
+            min.x -= padding;
+            min.z -= padding;
+            max.x += padding;
+            max.z += padding;
+
+            return { min, max, center: new THREE.Vector3().addVectors(min, max).multiplyScalar(0.5) };
+        }
+
+        function createIsometricCamera(bounds, width, height, padding) {
+            const { min, max, center } = bounds;
+            
+            // Calculate the size needed to fit the track
+            const trackWidth = max.x - min.x;
+            const trackDepth = max.z - min.z;
+            const trackHeight = Math.max(max.y - min.y, 10);
+
+            // Isometric angles: 
+            // - Camera looks down at ~35.264° from horizontal (arctan(1/√2))
+            // - Rotated 45° around vertical axis
+            const isoAngle = Math.atan(1 / Math.sqrt(2)); // ~35.264°
+            const rotationAngle = Math.PI / 4; // 45°
+
+            // Calculate the diagonal extent for proper framing
+            // In isometric view, we see width and depth at 45°
+            const diagonalExtent = Math.sqrt(trackWidth * trackWidth + trackDepth * trackDepth);
+            const verticalExtent = trackHeight / Math.cos(isoAngle);
+            
+            // The visible area in isometric projection
+            const visibleWidth = diagonalExtent * Math.cos(rotationAngle) + diagonalExtent * Math.sin(rotationAngle);
+            const visibleHeight = diagonalExtent * Math.sin(isoAngle) + verticalExtent;
+
+            // Calculate frustum size based on aspect ratio
+            const aspect = width / height;
+            let frustumWidth, frustumHeight;
+
+            if (visibleWidth / visibleHeight > aspect) {
+                // Width constrained
+                frustumWidth = visibleWidth * 1.2;
+                frustumHeight = frustumWidth / aspect;
+            } else {
+                // Height constrained
+                frustumHeight = visibleHeight * 1.2;
+                frustumWidth = frustumHeight * aspect;
+            }
+
+            // Create orthographic camera
+            const camera = new THREE.OrthographicCamera(
+                -frustumWidth / 2, frustumWidth / 2,
+                frustumHeight / 2, -frustumHeight / 2,
+                0.1, 1000
+            );
+
+            // Position camera at isometric angle
+            const distance = Math.max(trackWidth, trackDepth, trackHeight) * 2;
+            camera.position.set(
+                center.x + distance * Math.sin(rotationAngle) * Math.cos(isoAngle),
+                center.y + distance * Math.sin(isoAngle) + trackHeight / 2,
+                center.z + distance * Math.cos(rotationAngle) * Math.cos(isoAngle)
+            );
+            
+            camera.lookAt(center.x, center.y + trackHeight / 4, center.z);
+            camera.updateProjectionMatrix();
+
+            return camera;
+        }
+
+        function drawScaleIndicator(ctx, bounds, camera, canvasWidth, canvasHeight) {
+            // Calculate approximate scale
+            const trackWidth = bounds.max.x - bounds.min.x;
+            const frustumWidth = camera.right - camera.left;
+            const pixelsPerUnit = canvasWidth / frustumWidth;
+            
+            // Choose a nice round scale length
+            let scaleLength = 10; // meters
+            if (trackWidth < 20) scaleLength = 5;
+            if (trackWidth > 50) scaleLength = 20;
+            
+            const scalePixels = scaleLength * pixelsPerUnit * 0.7; // Approximate due to isometric projection
+            
+            // Draw scale bar
+            const x = 30;
+            const y = canvasHeight - 100;
+            
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.fillRect(x - 5, y - 25, scalePixels + 60, 35);
+            
+            ctx.strokeStyle = '#37474f';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + scalePixels, y);
+            ctx.stroke();
+            
+            // End caps
+            ctx.beginPath();
+            ctx.moveTo(x, y - 8);
+            ctx.lineTo(x, y + 8);
+            ctx.moveTo(x + scalePixels, y - 8);
+            ctx.lineTo(x + scalePixels, y + 8);
+            ctx.stroke();
+            
+            // Label
+            ctx.fillStyle = '#37474f';
+            ctx.font = 'bold 14px "Exo 2", Arial, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText(`${scaleLength}m`, x + scalePixels + 8, y + 5);
+        }
+
+        function drawCompass(ctx, x, y) {
+            const size = 40;
+            
+            // Background circle
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.beginPath();
+            ctx.arc(x, y, size + 10, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.strokeStyle = '#37474f';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(x, y, size + 5, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // North arrow (pointing up-left in isometric view, which maps to +Z)
+            const northAngle = -Math.PI / 4 - Math.PI / 2; // Adjusted for isometric
+            
+            ctx.fillStyle = '#ff5252';
+            ctx.beginPath();
+            ctx.moveTo(x + Math.cos(northAngle) * size, y + Math.sin(northAngle) * size);
+            ctx.lineTo(x + Math.cos(northAngle + 2.8) * 12, y + Math.sin(northAngle + 2.8) * 12);
+            ctx.lineTo(x + Math.cos(northAngle - 2.8) * 12, y + Math.sin(northAngle - 2.8) * 12);
+            ctx.closePath();
+            ctx.fill();
+            
+            // South arrow
+            ctx.fillStyle = '#37474f';
+            ctx.beginPath();
+            ctx.moveTo(x + Math.cos(northAngle + Math.PI) * size, y + Math.sin(northAngle + Math.PI) * size);
+            ctx.lineTo(x + Math.cos(northAngle + Math.PI + 2.8) * 12, y + Math.sin(northAngle + Math.PI + 2.8) * 12);
+            ctx.lineTo(x + Math.cos(northAngle + Math.PI - 2.8) * 12, y + Math.sin(northAngle + Math.PI - 2.8) * 12);
+            ctx.closePath();
+            ctx.fill();
+            
+            // N label
+            ctx.fillStyle = '#ff5252';
+            ctx.font = 'bold 16px "Bebas Neue", Arial, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('N', x + Math.cos(northAngle) * (size + 20), y + Math.sin(northAngle) * (size + 20) + 5);
+        }
+
         function checkURLParams() {
-            const track = new URLSearchParams(window.location.search).get('track');
-            if (track) {
+            const params = new URLSearchParams(window.location.search);
+            const track = params.get('track');
+            const share = params.get('share');
+            
+            if (share) {
+                // Handle compressed share URL - auto-start animation
+                setTimeout(() => {
+                    const trackData = decodeShareData(share);
+                    if (trackData) {
+                        loadTrackData(trackData, true); // true = auto-start animation
+                        // Clean URL without reloading
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    } else {
+                        showNotification('Invalid share link', true);
+                    }
+                }, 900);
+            } else if (track) {
+                // Handle legacy track parameter
                 try {
                     setTimeout(() => { document.getElementById('loadData').value = decodeURIComponent(track); loadTrack(); }, 800);
                 } catch (e) { console.warn('Failed to parse track from URL:', e); }
+            }
+        }
+
+        function loadTrackData(track, autoStart = false) {
+            clearAll(true);
+            track.gates.forEach(g => createGate(g.type, new THREE.Vector3(g.position.x, g.position.y, g.position.z), g.rotation || 0));
+            if (track.pathPoints?.length) {
+                pathPoints = track.pathPoints.map(p => new THREE.Vector3(p.x, p.y, p.z));
+                updatePathVisualization();
+                document.getElementById('animateBtn').disabled = pathPoints.length < 2;
+            }
+            saveState();
+            showNotification(`Loaded: ${track.name}`);
+            
+            // Auto-start animation if requested and path exists
+            if (autoStart && pathPoints.length >= 2) {
+                // Lock the track first
+                if (!isLocked) toggleLock();
+                // Start animation after a short delay for visual effect
+                setTimeout(() => {
+                    if (!isAnimating) toggleAnimation();
+                }, 500);
             }
         }
 
